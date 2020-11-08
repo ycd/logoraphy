@@ -26,7 +26,7 @@ func main() {
 	companyName := flag.String("name", "", "Company name, a string.")
 
 	imageType := flag.String("type", "jpeg", "Output format, JPEG or PNG.")
-	bg := flag.String("bg", "primary", "Background color.")
+	bg := flag.String("bg", "", "Background color.")
 
 	flag.Parse()
 
