@@ -16,6 +16,7 @@ import (
 
 	"flag"
 
+	"github.com/disintegration/imaging"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
 )
@@ -27,6 +28,7 @@ func main() {
 
 	imageType := flag.String("type", "jpeg", "Output format, JPEG or PNG.")
 	bg := flag.String("bg", "", "Background color.")
+	size := flag.Int("size", 0, "Pixel size of the output.")
 
 	flag.Parse()
 
@@ -41,7 +43,7 @@ func main() {
 		image = logoJPEG{companyName: processCompanyName(*companyName)}
 	}
 
-	_ = generate(image, *bg)
+	_ = generate(image, *bg, *size)
 
 }
 
@@ -59,11 +61,11 @@ type logoJPEG struct {
 }
 
 type logo interface {
-	generateLogo(constColor string) error
+	generateLogo(constColor string, size int) error
 }
 
-func generate(l logo, constColor string) error {
-	return l.generateLogo(constColor)
+func generate(l logo, constColor string, size int) error {
+	return l.generateLogo(constColor, size)
 }
 
 func processCompanyName(companyName string) string {
@@ -86,7 +88,7 @@ func selectFontSize(res resolution) int {
 	return fontSize
 }
 
-func (logo logoJPEG) generateLogo(constColor string) error {
+func (logo logoJPEG) generateLogo(constColor string, size int) error {
 
 	// setup the background
 	bgResolution := selectResolution(len(logo.companyName))
@@ -94,7 +96,7 @@ func (logo logoJPEG) generateLogo(constColor string) error {
 	upperLeft := image.Point{0, 0}
 	lowerRight := image.Point{bgResolution.width, bgResolution.height}
 
-	myLogo := image.NewRGBA(image.Rectangle{upperLeft, lowerRight})
+	myLogo := image.NewNRGBA(image.Rectangle{upperLeft, lowerRight})
 
 	// background color
 	backgroundColor := image.NewUniform(getRandomColor(constColor))
@@ -150,6 +152,9 @@ func (logo logoJPEG) generateLogo(constColor string) error {
 	}
 
 	defer f.Close()
+	if size != 0 {
+		myLogo = imaging.Resize(myLogo, size, 0, imaging.Lanczos) // Resize image with the given size
+	}
 
 	err = jpeg.Encode(f, myLogo, nil)
 	if err != nil {
@@ -160,14 +165,14 @@ func (logo logoJPEG) generateLogo(constColor string) error {
 
 }
 
-func (logo logoPNG) generateLogo(constColor string) error {
+func (logo logoPNG) generateLogo(constColor string, size int) error {
 
 	bgResolution := selectResolution(len(logo.companyName))
 
 	upperLeft := image.Point{0, 0}
 	lowerRight := image.Point{bgResolution.width, bgResolution.height}
 
-	myLogo := image.NewRGBA(image.Rectangle{upperLeft, lowerRight})
+	myLogo := image.NewNRGBA(image.Rectangle{upperLeft, lowerRight})
 
 	// write the company name
 	fontSize := float64(selectFontSize(bgResolution))
@@ -217,6 +222,9 @@ func (logo logoPNG) generateLogo(constColor string) error {
 	}
 
 	defer f.Close()
+	if size != 0 {
+		myLogo = imaging.Resize(myLogo, size, 0, imaging.Lanczos) // Resize image with the given size
+	}
 
 	err = png.Encode(f, myLogo)
 	if err != nil {
