@@ -32,14 +32,14 @@ Usage of ./logoraphy:
 
 ### Serving as API endpoint
 
-```golang
+```
 git switch fiber-serving
 go run .
 ```
 
 ### Usage from api
 
-```golang
+```
 Path params:
     companyName string
 
