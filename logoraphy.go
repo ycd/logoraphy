@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -47,7 +46,7 @@ func main() {
 		return c.SendStream(bytes.NewReader(logo))
 	})
 
-	app.Listen(fmt.Sprintf(":%s", getPort()))
+	app.Listen(":3000")
 }
 
 type resolution struct {
@@ -362,14 +361,4 @@ func selectFontSize(res resolution) int {
 		fontSize = 170
 	}
 	return fontSize
-}
-
-func getPort() string {
-	var port = os.Getenv("PORT")
-	// Set a default port if there is nothing in the environment
-	if port == "" {
-		port = "4747"
-		fmt.Println("INFO: No PORT environment variable detected, defaulting to " + port)
-	}
-	return ":" + port
 }
