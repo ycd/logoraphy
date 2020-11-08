@@ -11,9 +11,11 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
@@ -24,11 +26,12 @@ func main() {
 	app := fiber.New()
 
 	app.Get("/:companyName", func(c *fiber.Ctx) error {
+		var image logo
+
 		companyName := c.Params("companyName") // Get company name
 		bg := c.Query("bg")
-
 		imageType := c.Query("type")
-		var image logo
+		size := c.Query("size")
 
 		if imageType == "png" {
 			image = logoPNG{companyName: processCompanyName(companyName)}
@@ -36,7 +39,9 @@ func main() {
 			image = logoJPEG{companyName: processCompanyName(companyName)}
 		}
 
-		logo, _ := generate(image, bg) // Generate logo
+		logoSize, _ := strconv.Atoi(size)
+
+		logo, _ := generate(image, bg, logoSize) // Generate logo
 
 		return c.SendStream(bytes.NewReader(logo))
 	})
@@ -58,11 +63,11 @@ type logoJPEG struct {
 }
 
 type logo interface {
-	generateLogo(constColor string) ([]byte, error)
+	generateLogo(constColor string, size int) ([]byte, error)
 }
 
-func generate(l logo, constColor string) ([]byte, error) {
-	return l.generateLogo(constColor)
+func generate(l logo, constColor string, size int) ([]byte, error) {
+	return l.generateLogo(constColor, size)
 }
 
 func processCompanyName(companyName string) string {
@@ -70,74 +75,7 @@ func processCompanyName(companyName string) string {
 	return companyName
 }
 
-func selectResolution(companyNameLength int) resolution {
-	res := resolution{}
-	switch {
-	case companyNameLength < 5:
-		res = resolution{width: 1024, height: 768}
-	case companyNameLength <= 10:
-		res = resolution{width: 1366, height: 768}
-	case companyNameLength < 15:
-		res = resolution{width: 1920, height: 1020}
-	default:
-		res = resolution{width: 2560, height: 1440}
-	}
-	return res
-}
-
-func selectCenterPosition(companyNameLength int) int {
-	// TODO Create an algorithm to handle this.
-
-	var number int
-	switch {
-	case companyNameLength < 3:
-		number = 600
-	case companyNameLength == 3:
-		number = 340
-	case companyNameLength == 4:
-		number = 200
-	case companyNameLength == 5:
-		number = 140
-	case companyNameLength == 6:
-		number = 90
-	case companyNameLength == 7:
-		number = 70
-	case companyNameLength == 8:
-		number = 90
-	case companyNameLength == 9:
-		number = 110
-	case companyNameLength == 10:
-		number = 115
-	case companyNameLength == 13:
-		number = 100
-	case companyNameLength == 14:
-		number = 110
-	case companyNameLength < 15:
-		number = 70
-	case companyNameLength < 20:
-		number = 70
-	default:
-		number = 40
-	}
-	return number
-}
-
-func selectFontSize(res resolution) int {
-	var fontSize int
-	switch {
-	case res.width == 1024:
-		fontSize = 160
-	case res.width == 1366:
-		fontSize = 155
-	case res.width == 1920:
-		fontSize = 170
-	default:
-		fontSize = 170
-	}
-	return fontSize
-}
-
-func (logo logoJPEG) generateLogo(constColor string) ([]byte, error) {
+func (logo logoJPEG) generateLogo(constColor string, size int) ([]byte, error) {
 
 	// setup the background
 	bgResolution := selectResolution(len(logo.companyName))
@@ -145,7 +83,7 @@ func (logo logoJPEG) generateLogo(constColor string) ([]byte, error) {
 	upperLeft := image.Point{0, 0}
 	lowerRight := image.Point{bgResolution.width, bgResolution.height}
 
-	myLogo := image.NewRGBA(image.Rectangle{upperLeft, lowerRight})
+	myLogo := image.NewNRGBA(image.Rectangle{upperLeft, lowerRight})
 
 	// background color
 	backgroundColor := image.NewUniform(getRandomColor(constColor))
@@ -196,6 +134,10 @@ func (logo logoJPEG) generateLogo(constColor string) ([]byte, error) {
 	}
 
 	buf := new(bytes.Buffer)
+	if size != 0 {
+		myLogo = imaging.Resize(myLogo, size, 0, imaging.Lanczos) // Resize image with the given size
+	}
+
 	err := jpeg.Encode(buf, myLogo, nil)
 	if err != nil {
 		panic(err)
@@ -205,14 +147,14 @@ func (logo logoJPEG) generateLogo(constColor string) ([]byte, error) {
 
 }
 
-func (logo logoPNG) generateLogo(constColor string) ([]byte, error) {
+func (logo logoPNG) generateLogo(constColor string, size int) ([]byte, error) {
 
 	bgResolution := selectResolution(len(logo.companyName))
 
 	upperLeft := image.Point{0, 0}
 	lowerRight := image.Point{bgResolution.width, bgResolution.height}
 
-	myLogo := image.NewRGBA(image.Rectangle{upperLeft, lowerRight})
+	myLogo := image.NewNRGBA(image.Rectangle{upperLeft, lowerRight})
 
 	// write the company name
 	fontSize := float64(selectFontSize(bgResolution))
@@ -257,6 +199,11 @@ func (logo logoPNG) generateLogo(constColor string) ([]byte, error) {
 	}
 
 	buf := new(bytes.Buffer)
+
+	if size != 0 {
+		myLogo = imaging.Resize(myLogo, size, 0, imaging.Lanczos) // Resize image with the given size
+	}
+
 	err := png.Encode(buf, myLogo)
 	if err != nil {
 		panic(err)
@@ -347,4 +294,71 @@ func getConstantColor(colorName string) color.RGBA {
 		}
 	}
 	return constColor
+}
+
+func selectResolution(companyNameLength int) resolution {
+	res := resolution{}
+	switch {
+	case companyNameLength < 5:
+		res = resolution{width: 1024, height: 768}
+	case companyNameLength <= 10:
+		res = resolution{width: 1366, height: 768}
+	case companyNameLength < 15:
+		res = resolution{width: 1920, height: 1020}
+	default:
+		res = resolution{width: 2560, height: 1440}
+	}
+	return res
+}
+
+func selectCenterPosition(companyNameLength int) int {
+	// TODO Create an algorithm to handle this.
+
+	var number int
+	switch {
+	case companyNameLength < 3:
+		number = 600
+	case companyNameLength == 3:
+		number = 340
+	case companyNameLength == 4:
+		number = 200
+	case companyNameLength == 5:
+		number = 140
+	case companyNameLength == 6:
+		number = 90
+	case companyNameLength == 7:
+		number = 70
+	case companyNameLength == 8:
+		number = 90
+	case companyNameLength == 9:
+		number = 110
+	case companyNameLength == 10:
+		number = 115
+	case companyNameLength == 13:
+		number = 100
+	case companyNameLength == 14:
+		number = 110
+	case companyNameLength < 15:
+		number = 70
+	case companyNameLength < 20:
+		number = 70
+	default:
+		number = 40
+	}
+	return number
+}
+
+func selectFontSize(res resolution) int {
+	var fontSize int
+	switch {
+	case res.width == 1024:
+		fontSize = 160
+	case res.width == 1366:
+		fontSize = 155
+	case res.width == 1920:
+		fontSize = 170
+	default:
+		fontSize = 170
+	}
+	return fontSize
 }
