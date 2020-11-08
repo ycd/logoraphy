@@ -308,6 +308,7 @@ func getConstantColor(colorName string) color.RGBA {
 		constantColors{name: "deep orange", color: color.RGBA{255, 87, 34, 255}},
 		constantColors{name: "gray", color: color.RGBA{158, 158, 158, 255}},
 		constantColors{name: "primary", color: color.RGBA{55, 0, 179, 255}},
+		constantColors{name: "black", color: color.RGBA{0,0,0,7}},
 	}
 
 	for _, color := range colors {
