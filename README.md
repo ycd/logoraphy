@@ -21,11 +21,13 @@ go build .
 ### Usage with command line interface
 
 ```go
-Usage of ./logoraphy:
+Usage of logoraphy:
   -bg string
         Background color.
   -name string
         Company name, a string.
+  -size int
+        Pixel size of the output.
   -type string
         Output format, JPEG or PNG. (default "jpeg")
 ```
@@ -50,7 +52,7 @@ Query params:
     bg: string
         - Default: Generates random color.
         - indigo, red, primary, gray..
-    
+    size: int
    
 ```
 ## Examples
