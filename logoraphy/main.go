@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"image/color"
@@ -11,37 +10,39 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"flag"
+
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
 )
 
 func main() {
+	var image logo
 
-	app := fiber.New()
+	companyName := flag.String("name", "", "Company name, a string.")
 
-	app.Get("/:companyName", func(c *fiber.Ctx) error {
-		companyName := c.Params("companyName") // Get company name
-		bg := c.Query("bg")
+	imageType := flag.String("type", "jpeg", "Output format, JPEG or PNG.")
+	bg := flag.String("bg", "primary", "Background color.")
 
-		imageType := c.Query("type")
-		var image logo
+	flag.Parse()
 
-		if imageType == "png" {
-			image = logoPNG{companyName: processCompanyName(companyName)}
-		} else {
-			image = logoJPEG{companyName: processCompanyName(companyName)}
-		}
+	if *companyName == "" {
+		fmt.Println("Company name cannot be empty.")
+		os.Exit(1)
+	}
 
-		logo, _ := generate(image, bg) // Generate logo
+	if *imageType == "png" {
+		image = logoPNG{companyName: processCompanyName(*companyName)}
+	} else {
+		image = logoJPEG{companyName: processCompanyName(*companyName)}
+	}
 
-		return c.SendStream(bytes.NewReader(logo))
-	})
+	_ = generate(image, *bg)
 
-	app.Listen(":3000")
 }
 
 type resolution struct {
@@ -58,68 +59,16 @@ type logoJPEG struct {
 }
 
 type logo interface {
-	generateLogo(constColor string) ([]byte, error)
+	generateLogo(constColor string) error
 }
 
-func generate(l logo, constColor string) ([]byte, error) {
+func generate(l logo, constColor string) error {
 	return l.generateLogo(constColor)
 }
 
 func processCompanyName(companyName string) string {
 	companyName = strings.Replace(companyName, "_", " ", 1)
 	return companyName
-}
-
-func selectResolution(companyNameLength int) resolution {
-	res := resolution{}
-	switch {
-	case companyNameLength < 5:
-		res = resolution{width: 1024, height: 768}
-	case companyNameLength <= 10:
-		res = resolution{width: 1366, height: 768}
-	case companyNameLength < 15:
-		res = resolution{width: 1920, height: 1020}
-	default:
-		res = resolution{width: 2560, height: 1440}
-	}
-	return res
-}
-
-func selectCenterPosition(companyNameLength int) int {
-	// TODO Create an algorithm to handle this.
-
-	var number int
-	switch {
-	case companyNameLength < 3:
-		number = 600
-	case companyNameLength == 3:
-		number = 340
-	case companyNameLength == 4:
-		number = 200
-	case companyNameLength == 5:
-		number = 140
-	case companyNameLength == 6:
-		number = 90
-	case companyNameLength == 7:
-		number = 70
-	case companyNameLength == 8:
-		number = 90
-	case companyNameLength == 9:
-		number = 110
-	case companyNameLength == 10:
-		number = 115
-	case companyNameLength == 13:
-		number = 100
-	case companyNameLength == 14:
-		number = 110
-	case companyNameLength < 15:
-		number = 70
-	case companyNameLength < 20:
-		number = 70
-	default:
-		number = 40
-	}
-	return number
 }
 
 func selectFontSize(res resolution) int {
@@ -137,7 +86,7 @@ func selectFontSize(res resolution) int {
 	return fontSize
 }
 
-func (logo logoJPEG) generateLogo(constColor string) ([]byte, error) {
+func (logo logoJPEG) generateLogo(constColor string) error {
 
 	// setup the background
 	bgResolution := selectResolution(len(logo.companyName))
@@ -177,7 +126,7 @@ func (logo logoJPEG) generateLogo(constColor string) ([]byte, error) {
 		_, err := myFontContext.DrawString(stringLower, pt)
 		if err != nil {
 			fmt.Println(err)
-			return nil, nil
+			return nil
 		}
 
 		if stringLower == "I" || stringLower == "." {
@@ -195,17 +144,23 @@ func (logo logoJPEG) generateLogo(constColor string) ([]byte, error) {
 		}
 	}
 
-	buf := new(bytes.Buffer)
-	err := jpeg.Encode(buf, myLogo, nil)
+	f, err := os.Create(fmt.Sprintf("%s.jpeg", logo.companyName))
 	if err != nil {
 		panic(err)
 	}
 
-	return buf.Bytes(), nil
+	defer f.Close()
+
+	err = jpeg.Encode(f, myLogo, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return nil
 
 }
 
-func (logo logoPNG) generateLogo(constColor string) ([]byte, error) {
+func (logo logoPNG) generateLogo(constColor string) error {
 
 	bgResolution := selectResolution(len(logo.companyName))
 
@@ -238,7 +193,7 @@ func (logo logoPNG) generateLogo(constColor string) ([]byte, error) {
 		_, err := myFontContext.DrawString(stringLower, pt)
 		if err != nil {
 			fmt.Println(err)
-			return nil, nil
+			return nil
 		}
 
 		if stringLower == "I" || stringLower == "." {
@@ -256,13 +211,19 @@ func (logo logoPNG) generateLogo(constColor string) ([]byte, error) {
 		}
 	}
 
-	buf := new(bytes.Buffer)
-	err := png.Encode(buf, myLogo)
+	f, err := os.Create(fmt.Sprintf("%s.png", logo.companyName))
 	if err != nil {
 		panic(err)
 	}
 
-	return buf.Bytes(), nil
+	defer f.Close()
+
+	err = png.Encode(f, myLogo)
+	if err != nil {
+		panic(err)
+	}
+
+	return nil
 
 }
 
@@ -347,4 +308,56 @@ func getConstantColor(colorName string) color.RGBA {
 		}
 	}
 	return constColor
+}
+
+func selectResolution(companyNameLength int) resolution {
+	res := resolution{}
+	switch {
+	case companyNameLength < 5:
+		res = resolution{width: 1024, height: 768}
+	case companyNameLength <= 10:
+		res = resolution{width: 1366, height: 768}
+	case companyNameLength < 15:
+		res = resolution{width: 1920, height: 1020}
+	default:
+		res = resolution{width: 2560, height: 1440}
+	}
+	return res
+}
+
+func selectCenterPosition(companyNameLength int) int {
+	// TODO Create an algorithm to handle this.
+
+	var number int
+	switch {
+	case companyNameLength < 3:
+		number = 600
+	case companyNameLength == 3:
+		number = 340
+	case companyNameLength == 4:
+		number = 200
+	case companyNameLength == 5:
+		number = 140
+	case companyNameLength == 6:
+		number = 90
+	case companyNameLength == 7:
+		number = 70
+	case companyNameLength == 8:
+		number = 90
+	case companyNameLength == 9:
+		number = 110
+	case companyNameLength == 10:
+		number = 115
+	case companyNameLength == 13:
+		number = 100
+	case companyNameLength == 14:
+		number = 110
+	case companyNameLength < 15:
+		number = 70
+	case companyNameLength < 20:
+		number = 70
+	default:
+		number = 40
+	}
+	return number
 }
